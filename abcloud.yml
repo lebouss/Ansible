@@ -1,0 +1,139 @@
+---
+
+# play 1 : installation of apache mysql php & tomcat (for php & java app)
+- name: lampj services
+  hosts: all
+  tasks:
+  - name: installation
+    apt:
+      name: "{{item}}"
+      update_cache: yes
+      state: latest
+    loop:
+      - apache2
+      - libapache2-mod-php
+      - mysql-server
+      - php-mysql
+      - tomcat9
+      
+      
+# play 2 : apache configuration for abcloud.fr
+- name: apache setting
+  hosts: all
+  tasks:
+             
+  - name: Copy abcloud.fr Conf file
+    template:
+      src: "/home/admin1/ansible/apache_abcloud.fr.conf"
+      dest: "/etc/apache2/sites-available/abcloud.fr.conf"
+      
+  - name: set the default Apache port on 7080
+    lineinfile:
+      path: /etc/apache2/ports.conf
+      regexp: '^Listen '
+      insertafter: '^#Listen '
+      line: Listen 7080
+      
+  - name: delete the default index
+    file:
+      path: "/var/www/abcloud.fr/index.html"
+      state: absent    
+    
+  - name: disable default site
+    command: a2dissite 000-default.conf
+    
+  - name: enable abcloud.fr site
+    command: a2ensite abcloud.fr.conf
+    notify: restart apache
+    
+  handlers:
+    - name: restart apache
+      service:
+        name: apache2
+        state: restarted     
+      
+        
+# play 3 : configuration of php app (wordpress)
+- name: php app (wordpress)
+  hosts: all
+  tasks:
+    
+  - name: download and unarchive worpress
+    unarchive:
+      src: https://fr.wordpress.org/latest-fr_FR.tar.gz
+      dest: /var/www/
+      remote_src: yes
+      group: www-data
+      owner: www-data
+      mode: 0755
+      
+  - name: creates abcloud.fr directory
+    file:
+      path: /var/www/abcloud.fr
+      state: directory    
+      
+  - name: rename worpress directory
+    command: mv wordpress abcloud.fr
+    args:
+      chdir: /var/www/
+      
+  - name: Copy wordpress Conf file
+    template:
+      src: "/home/admin1/ansible/wp-config.php"
+      dest: "/var/www/abcloud.fr"
+      
+          
+#play 4 : configuration of java app (jenkins)
+- name: java app (jenkins)
+  hosts: all
+  tasks:
+   
+  - name: Download jenkins
+    get_url:
+      url: https://get.jenkins.io/war-stable/2.346.3/jenkins.war
+      dest: /home/ubuntu
+      
+  - name: copy jenkins to webapps
+    copy:
+     src: /home/ubuntu/jenkins.war
+     dest: /var/lib/tomcat9/webapps
+     remote_src: yes
+     
+  - name: JENKINS_HOME_DIRECTORY
+    file:
+      path: "/var/lib/tomcat9/.jenkins"
+      state: directory
+      owner: tomcat
+      group: tomcat
+      
+          
+#play 5 : configuration of nginx as reverse proxy
+- name: nginx
+  hosts: all
+  tasks:
+   
+  - name: Download nginx
+    apt:
+      name: nginx
+      update_cache: yes
+      state: latest
+      
+  - name: Copy nginx Conf file
+    template:
+      src: "/home/admin1/ansible/nginx_abcloud.fr.conf"
+      dest: "/etc/nginx/sites-available/abcloud.fr.conf"
+      
+  - name: disable default site
+    command: unlink /etc/nginx/sites-enabled/default  
+      
+  - name: enable custom site
+    command: ln -s /etc/nginx/sites-available/abcloud.fr.conf /etc/nginx/sites-enabled/abcloud.fr.conf
+    notify: restart nginx
+    
+  handlers:
+    - name: restart nginx
+      service:
+        name: nginx
+        state: restarted  
+      
+      
