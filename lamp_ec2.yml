@@ -1,0 +1,88 @@
+---
+#############################################################################################################################################################
+#
+#	configuration of LAMP server (wordpress app)
+#
+#############################################################################################################################################################
+
+# play 1 : installation of apache mysql & php (for php app)
+- name: lamp services
+  hosts: lamp
+  tasks:
+  - name: installation
+    apt:
+      name: "{{item}}"
+      update_cache: yes
+      state: latest
+    loop:
+      - apache2
+      - libapache2-mod-php
+      - mysql-server
+      - php-mysql
+      
+      
+# play 2 : apache configuration for abcloud.fr
+- name: apache setting
+  hosts: lamp
+  tasks:
+             
+  - name: Copy apache_website Conf file
+    template:
+      src: "{{apache_path_cfg}}/apache_{{apache_website}}.conf"
+      dest: "/etc/apache2/sites-available/{{apache_website}}.conf"
+      
+  - name: set the default Apache port on apache_port_cfg
+    lineinfile:
+      path: /etc/apache2/ports.conf
+      regexp: '^Listen '
+      insertafter: '^#Listen '
+      line: Listen "{{apache_port_cfg}}"
+      
+  - name: delete the default index
+    file:
+      path: "/var/www/{{apache_website}}/index.html"
+      state: absent    
+    
+  - name: disable default site
+    command: a2dissite 000-default.conf
+    
+  - name: enable apache_website site
+    command: a2ensite "{{apache_website}}.conf"
+    notify: restart apache
+    
+  handlers:
+    - name: restart apache
+      service:
+        name: apache2
+        state: restarted     
+      
+        
+# play 3 : configuration of php app (wordpress)
+- name: php app (wordpress)
+  hosts: lamp
+  tasks:
+    
+  - name: download and unarchive worpress
+    unarchive:
+      src: https://fr.wordpress.org/latest-fr_FR.tar.gz
+      dest: /var/www/
+      remote_src: yes
+      group: www-data
+      owner: www-data
+      mode: 0755
+      
+  - name: creates apache_website directory
+    file:
+      path: "/var/www/{{apache_website}}"
+      state: directory    
+      
+  - name: rename worpress directory
+    command: mv wordpress {{apache_website}}
+    args:
+      chdir: /var/www/
+      
+  - name: Copy wordpress Conf file
+    template:
+      src: "{{apache_path_cfg}}/wp-config.php"
+      dest: "/var/www/{{apache_website}}"
+

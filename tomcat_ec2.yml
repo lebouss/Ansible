@@ -1,0 +1,41 @@
+---
+
+#############################################################################################################################################################
+#
+#	configuration of Tomcat server for Java app (jenkins)
+#
+#############################################################################################################################################################
+
+# play 1 : installation of tomcat (for java app)
+- name: tomcat services
+  hosts: tomcat
+  tasks:
+  - name: installation
+    apt:
+      name: tomcat9
+      update_cache: yes
+      state: latest
+                
+#play 4 : configuration of java app (jenkins)
+- name: java app (jenkins)
+  hosts: tomcat
+  tasks:
+   
+  - name: Download jenkins
+    get_url:
+      url: https://get.jenkins.io/war-stable/2.346.3/jenkins.war
+      dest: /home/ubuntu
+      
+  - name: copy jenkins to webapps
+    copy:
+     src: /home/ubuntu/jenkins.war
+     dest: /var/lib/tomcat9/webapps
+     remote_src: yes
+     
+  - name: JENKINS_HOME_DIRECTORY
+    file:
+      path: "/var/lib/tomcat9/.jenkins"
+      state: directory
+      owner: tomcat
+      group: tomcat
+      

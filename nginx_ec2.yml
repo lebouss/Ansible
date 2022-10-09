@@ -1,0 +1,38 @@
+---
+
+#############################################################################################################################################################
+#
+#	configuration of Nginx server as reverse proxy
+#
+#############################################################################################################################################################      
+          
+#play 5 : configuration of nginx as reverse proxy
+- name: nginx
+  hosts: nginx
+  tasks:
+   
+  - name: Download nginx
+    apt:
+      name: nginx
+      update_cache: yes
+      state: latest
+      
+  - name: Copy nginx Conf file
+    template:
+      src: "{{nginx_path_cfg}}/nginx_{{nginx_virtual_host}}.conf"
+      dest: "/etc/nginx/sites-available/abcloud.fr.conf"
+      
+  - name: disable default site
+    command: unlink /etc/nginx/sites-enabled/default  
+      
+  - name: enable custom site
+    command: ln -s /etc/nginx/sites-available/abcloud.fr.conf /etc/nginx/sites-enabled/{{nginx_virtual_host}}.conf
+    notify: restart nginx
+    
+  handlers:
+    - name: restart nginx
+      service:
+        name: nginx
+        state: restarted  
+      
+      
